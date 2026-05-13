@@ -1,0 +1,32 @@
+name: 📊 ETF 시세 자동 업데이트
+
+on:
+  schedule:
+    - cron: '40 6 * * 1-5'  # 평일 오후 3시 40분 (한국시간)
+  workflow_dispatch:  # 수동으로도 실행 가능
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Python 설정
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: 라이브러리 설치
+        run: |
+          pip install FinanceDataReader requests pandas
+      
+      - name: 시세 업데이트 실행
+        run: python stock.py
+      
+      - name: 변경사항 커밋 및 푸시
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -A
+          git commit -m "✅ 시세 자동 업데이트: $(date '+%Y-%m-%d %H:%M:%S')"
+          git push
