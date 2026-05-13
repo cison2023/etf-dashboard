@@ -3,10 +3,12 @@ import json, os, re, sys, threading, time
 from datetime import datetime, timedelta
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-save_folder = r"C:\Users\SON\Desktop\주식프로젝트"
-html_file   = os.path.join(save_folder, "ETF_index_Ver3_1.html")
-save_path   = os.path.join(save_folder, "prices.json")
-KEEP_DAYS   = 35
+# GitHub Actions 환경 감지
+is_github = os.getenv('GITHUB_ACTIONS') == 'true'
+save_folder = os.getcwd()  # 현재 폴더 사용
+html_file = os.path.join(save_folder, "ETF_index_Ver3_1.html")
+save_path = os.path.join(save_folder, "prices.json")
+KEEP_DAYS = 35
 SERVER_PORT = 9877
 
 my_etfs = [
@@ -15,9 +17,6 @@ my_etfs = [
     '0098N0','0097L0','0105E0','329200','481060','0153K0','433970','0025N0','486290'
 ]
 
-# ═════════════════════════════════════════════════════════
-# 시세 업데이트 함수
-# ═════════════════════════════════════════════════════════
 def run_update():
     """시세 데이터를 수집하고 HTML 파일에 자동 반영"""
     master_history = {}
@@ -64,9 +63,9 @@ def run_update():
     with open(save_path, 'w', encoding='utf-8') as f:
         json.dump(sorted_history, f, ensure_ascii=False, indent=2)
 
-    # HTML 파일의 PYTHON_PRICES_DATA 블록 자동 업데이트
+    # HTML 파일 업데이트 (로컬 환경에서만)
     html_updated = False
-    if os.path.exists(html_file):
+    if os.path.exists(html_file) and not is_github:
         with open(html_file, 'r', encoding='utf-8') as f:
             html_content = f.read()
         
@@ -104,12 +103,7 @@ def run_update():
     print(f"[{datetime.now().strftime('%H:%M:%S')}] ✅ 업데이트 완료: {success_cnt}/{len(my_etfs)}종목 · {dates[0] if dates else 'N/A'}")
     return result
 
-# ═════════════════════════════════════════════════════════
-# HTTP 서버 (HTML에서 요청받아 시세 업데이트)
-# ═════════════════════════════════════════════════════════
 class PriceHandler(BaseHTTPRequestHandler):
-    """HTTP 요청 처리"""
-    
     def do_OPTIONS(self):
         self.send_response(200)
         self._set_cors_headers()
@@ -127,7 +121,6 @@ class PriceHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def do_POST(self):
-        """HTML에서 POST 요청 받아서 시세 업데이트 실행"""
         if self.path == '/update':
             try:
                 content_length = int(self.headers.get('Content-Length', 0))
@@ -135,10 +128,8 @@ class PriceHandler(BaseHTTPRequestHandler):
                 
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] 📩 업데이트 요청 수신")
                 
-                # 시세 업데이트 실행
                 result = run_update()
                 
-                # JSON 응답
                 response = json.dumps(result, ensure_ascii=False).encode('utf-8')
                 self.send_response(200)
                 self._set_cors_headers()
@@ -164,25 +155,17 @@ class PriceHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
     def _set_cors_headers(self):
-        """CORS 헤더 설정"""
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
 
     def log_message(self, format, *args):
-        """로그 출력"""
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {format%args}")
 
-# ═════════════════════════════════════════════════════════
-# 서버 실행
-# ═════════════════════════════════════════════════════════
 def run_server():
-    """HTTP 서버 시작"""
     server = HTTPServer(('localhost', SERVER_PORT), PriceHandler)
     print(f"\n{'='*60}")
     print(f"🖥️  시세 서버 실행 중 — http://localhost:{SERVER_PORT}")
-    print(f"이제 HTML의 '시세 업데이트 실행' 버튼을 클릭하면 자동 반영됩니다")
-    print(f"서버 종료: Ctrl+C 입력")
     print(f"{'='*60}\n")
     try:
         server.serve_forever()
@@ -190,15 +173,10 @@ def run_server():
         print("\n\n[서버 종료]")
         server.shutdown()
 
-# ═════════════════════════════════════════════════════════
-# 메인 실행
-# ═════════════════════════════════════════════════════════
 if __name__ == '__main__':
     if '--server' in sys.argv:
-        # 서버 모드: 항상 대기 상태
         run_server()
     else:
-        # 단순 업데이트 모드 (GitHub Actions용)
         print(f"\n{'='*60}")
         print(f"🚀 주식 시세 업데이트 스크립트")
         print(f"{'='*60}\n")
