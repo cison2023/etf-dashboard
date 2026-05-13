@@ -13,8 +13,6 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
       - name: Python 설정
         uses: actions/setup-python@v4
@@ -24,8 +22,15 @@ jobs:
       - name: 라이브러리 설치
         run: pip install yfinance pandas requests -q
 
+      - name: 현재 디렉토리 확인
+        run: |
+          pwd
+          ls -la
+
       - name: 시세 수집 및 저장
-        run: python update_prices.py
+        run: |
+          cd ${{ github.workspace }}
+          python update_prices.py
 
       - name: 커밋 및 푸시
         run: |
